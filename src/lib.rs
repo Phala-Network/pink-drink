@@ -1,7 +1,7 @@
 mod runtime;
 mod types;
 
-pub use runtime::{exec_in_mode, PinkRuntime};
+pub use runtime::PinkRuntime;
 pub use types::ExecMode;
 
 pub fn version() -> (u32, u32) {

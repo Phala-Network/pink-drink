@@ -33,7 +33,7 @@ fn deposit_pink_event(contract: AccountId, event: PinkEvent) {
 
 environmental::environmental!(exec_mode: ExecMode);
 
-pub fn exec_in_mode<T>(mut mode: ExecMode, f: impl FnOnce() -> T) -> T {
+pub(crate) fn exec_in_mode<T>(mut mode: ExecMode, f: impl FnOnce() -> T) -> T {
     exec_mode::using(&mut mode, f)
 }
 

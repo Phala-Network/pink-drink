@@ -20,7 +20,6 @@ use sp_runtime::{
     Perbill,
 };
 
-pub use extension::exec_in_mode;
 pub use pink_extension::{EcdhPublicKey, HookPoint, Message, OspMessage, PinkEvent};
 
 type Block = sp_runtime::generic::Block<
@@ -176,10 +175,7 @@ impl Runtime for PinkRuntime {
         pallet_balances::GenesisConfig::<Self> {
             balances: vec![(Self::default_actor(), INITIAL_BALANCE)],
         }
-        .assimilate_storage(storage)?;
-        exec_in_mode(crate::ExecMode::Transaction, || {
-            setup_cluster(&Self::default_actor())
-        })
+        .assimilate_storage(storage)
     }
 
     fn default_actor() -> AccountIdFor<Self> {
@@ -197,38 +193,45 @@ impl Runtime for PinkRuntime {
     }
 }
 
-fn setup_cluster(owner: &AccountId) -> Result<(), String> {
-    type PalletPink = Pink;
-    PalletPink::set_cluster_id(Hash::zero());
-    PalletPink::set_gas_price(0);
-    PalletPink::set_deposit_per_item(0);
-    PalletPink::set_deposit_per_byte(0);
-    PalletPink::set_treasury_account(&[0u8; 32].into());
+impl PinkRuntime {
+    pub fn setup_cluster() -> Result<(), String> {
+        type PalletPink = Pink;
+        PalletPink::set_cluster_id(Hash::zero());
+        PalletPink::set_gas_price(0);
+        PalletPink::set_deposit_per_item(0);
+        PalletPink::set_deposit_per_byte(0);
+        PalletPink::set_treasury_account(&[0u8; 32].into());
 
-    let system_code = include_bytes!("../artifacts/system.wasm").to_vec();
+        let system_code = include_bytes!("../artifacts/system.wasm").to_vec();
 
-    let code_hash = upload_code(owner.clone(), system_code, true)
-        .map_err(|err| format!("FailedToUploadSystemCode: {err:?}"))?;
+        let owner = PinkRuntime::default_actor();
+        let code_hash = upload_code(owner.clone(), system_code, true)
+            .map_err(|err| format!("FailedToUploadSystemCode: {err:?}"))?;
 
-    let selector = vec![0xed, 0x4b, 0x9d, 0x1b]; // The default() constructor
-    let result = Contracts::bare_instantiate(
-        owner.clone(),
-        0,
-        Weight::MAX,
-        None,
-        pallet_contracts_primitives::Code::Existing(code_hash),
-        selector,
-        vec![],
-        pallet_contracts::DebugInfo::UnsafeDebug,
-        pallet_contracts::CollectEvents::Skip,
-    );
-    log::info!("Contract instantiation result: {:?}", &result.result);
-    let address = result
-        .result
-        .expect("Failed to instantiate system contract")
-        .account_id;
-    PalletPink::set_system_contract(&address);
-    Ok(())
+        let selector = vec![0xed, 0x4b, 0x9d, 0x1b]; // The default() constructor
+        let result = Contracts::bare_instantiate(
+            owner.clone(),
+            0,
+            Weight::MAX,
+            None,
+            pallet_contracts_primitives::Code::Existing(code_hash),
+            selector,
+            vec![],
+            pallet_contracts::DebugInfo::UnsafeDebug,
+            pallet_contracts::CollectEvents::Skip,
+        );
+        log::info!("Contract instantiation result: {:?}", &result.result);
+        let address = result
+            .result
+            .expect("Failed to instantiate system contract")
+            .account_id;
+        PalletPink::set_system_contract(&address);
+        Ok(())
+    }
+
+    pub fn execute_in_mode<T>(mode: crate::ExecMode, f: impl FnOnce() -> T) -> T {
+        extension::exec_in_mode(mode, f)
+    }
 }
 
 fn upload_code(account: AccountId, code: Vec<u8>, deterministic: bool) -> Result<Hash, String> {
