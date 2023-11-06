@@ -1,0 +1,20 @@
+[package]
+name = "drink-pink-runtime"
+version = "1.2.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4.20"
+drink = "0.6.0"
+pink-extension = "0.4.6"
+pink-extension-runtime = "0.4.6"
+scale = { version = "3.6.5", package = "parity-scale-codec" }
+scale-info = "2.10.0"
+frame-support = "23.0.0"
+frame-system = "23.0.0"
+pallet-balances = "23.0.0"
+sp-core = "23.0.0"
+pallet-contracts = { version = "22.0.1", package = "pallet-contracts-for-drink" }
+pallet-timestamp = "22.0.0"
+environmental = "1.1.4"
+pallet-contracts-primitives = "26.0.0"
