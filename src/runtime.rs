@@ -16,6 +16,7 @@ use pallet_contracts::{
 };
 use pallet_contracts::{CollectEvents, DebugInfo, Determinism};
 use pallet_contracts_primitives::Code;
+use scale::Encode;
 use sp_runtime::{
     traits::{Dispatchable, IdentityLookup},
     Perbill,
@@ -206,7 +207,7 @@ impl PinkRuntime {
         let system_code = include_bytes!("../artifacts/system.wasm").to_vec();
 
         let owner = PinkRuntime::default_actor();
-        let code_hash = Self::upload_code(owner.clone(), system_code, true)
+        let system_code_hash = Self::upload_code(owner.clone(), system_code, true)
             .map_err(|err| format!("FailedToUploadSystemCode: {err:?}"))?;
 
         let selector = vec![0xed, 0x4b, 0x9d, 0x1b]; // The default() constructor
@@ -215,18 +216,49 @@ impl PinkRuntime {
             0,
             Weight::MAX,
             None,
-            pallet_contracts_primitives::Code::Existing(code_hash),
+            pallet_contracts_primitives::Code::Existing(system_code_hash),
             selector,
             vec![],
             pallet_contracts::DebugInfo::UnsafeDebug,
             pallet_contracts::CollectEvents::Skip,
         );
         log::info!("Contract instantiation result: {:?}", &result.result);
-        let address = result
+        let system_address = result
             .result
             .expect("Failed to instantiate system contract")
             .account_id;
-        PalletPink::set_system_contract(&address);
+        PalletPink::set_system_contract(&system_address);
+
+        let selector_set_driver = 0xaa1e2030u32.to_be_bytes();
+
+        let qjs_code = include_bytes!("../artifacts/qjs.wasm").to_vec();
+        let qjs_code_hash = Self::upload_code(owner.clone(), qjs_code, false)
+            .map_err(|err| format!("FailedToUploadQjsCode: {err:?}"))?;
+        let input_data = (selector_set_driver, "JsDelegate", qjs_code_hash).encode();
+        Self::call(
+            owner.clone(),
+            system_address.clone(),
+            0,
+            u64::MAX,
+            None,
+            input_data,
+            true,
+        )
+        .map_err(|err| format!("FailedToCallSetDriver: {err:?}"))?;
+        let qjs2_code = include_bytes!("../artifacts/qjs2.wasm").to_vec();
+        let qjs2_code_hash = Self::upload_code(owner.clone(), qjs2_code, false)
+            .map_err(|err| format!("FailedToUploadQjs2Code: {err:?}"))?;
+        let input_data = (selector_set_driver, "JsDelegate2", qjs2_code_hash).encode();
+        let data = Self::call(
+            owner.clone(),
+            system_address,
+            0,
+            u64::MAX,
+            None,
+            input_data,
+            true,
+        )
+        .map_err(|err| format!("FailedToCallSetDriver: {err:?}"))?;
         Ok(())
     }
 
