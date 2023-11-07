@@ -9,12 +9,13 @@ use frame_support::{
     traits::{ConstBool, ConstU32},
     weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight},
 };
-use pallet_contracts::Determinism;
 use pallet_contracts::{
     migration::{v11, v12, v13, v14, v15},
     weights::SubstrateWeight,
     Config, Frame, Schedule,
 };
+use pallet_contracts::{CollectEvents, DebugInfo, Determinism};
+use pallet_contracts_primitives::Code;
 use sp_runtime::{
     traits::{Dispatchable, IdentityLookup},
     Perbill,
@@ -205,7 +206,7 @@ impl PinkRuntime {
         let system_code = include_bytes!("../artifacts/system.wasm").to_vec();
 
         let owner = PinkRuntime::default_actor();
-        let code_hash = upload_code(owner.clone(), system_code, true)
+        let code_hash = Self::upload_code(owner.clone(), system_code, true)
             .map_err(|err| format!("FailedToUploadSystemCode: {err:?}"))?;
 
         let selector = vec![0xed, 0x4b, 0x9d, 0x1b]; // The default() constructor
@@ -232,19 +233,85 @@ impl PinkRuntime {
     pub fn execute_in_mode<T>(mode: crate::ExecMode, f: impl FnOnce() -> T) -> T {
         extension::exec_in_mode(mode, f)
     }
-}
 
-fn upload_code(account: AccountId, code: Vec<u8>, deterministic: bool) -> Result<Hash, String> {
-    Contracts::bare_upload_code(
-        account,
-        code,
-        None,
-        if deterministic {
-            Determinism::Enforced
-        } else {
-            Determinism::Relaxed
-        },
-    )
-    .map(|v| v.code_hash)
-    .map_err(|err| format!("{err:?}"))
+    pub fn upload_code(
+        account: AccountId,
+        code: Vec<u8>,
+        deterministic: bool,
+    ) -> Result<Hash, String> {
+        Contracts::bare_upload_code(
+            account,
+            code,
+            None,
+            if deterministic {
+                Determinism::Enforced
+            } else {
+                Determinism::Relaxed
+            },
+        )
+        .map(|v| v.code_hash)
+        .map_err(|err| format!("{err:?}"))
+    }
+
+    pub fn instantiate(
+        origin: AccountId,
+        value: Balance,
+        gas_limit: u64,
+        storage_deposit_limit: Option<Balance>,
+        code_hash: Hash,
+        data: Vec<u8>,
+        salt: Vec<u8>,
+    ) -> Result<AccountId, String> {
+        let result = Contracts::bare_instantiate(
+            origin,
+            value,
+            Weight::from_parts(gas_limit, u64::MAX),
+            storage_deposit_limit,
+            Code::Existing(code_hash),
+            data,
+            salt,
+            DebugInfo::Skip,
+            CollectEvents::Skip,
+        );
+        match result.result {
+            Ok(v) => {
+                if v.result.did_revert() {
+                    Err(format!("Contract instantiation reverted"))
+                } else {
+                    Ok(v.account_id)
+                }
+            }
+            Err(err) => Err(format!("{err:?}")),
+        }
+    }
+
+    pub fn call(
+        origin: AccountId,
+        dest: AccountId,
+        value: Balance,
+        gas_limit: u64,
+        storage_deposit_limit: Option<Balance>,
+        data: Vec<u8>,
+        deterministic: bool,
+    ) -> Result<Vec<u8>, String> {
+        let result = Contracts::bare_call(
+            origin,
+            dest,
+            value,
+            Weight::from_parts(gas_limit, u64::MAX),
+            storage_deposit_limit,
+            data,
+            DebugInfo::Skip,
+            CollectEvents::Skip,
+            if deterministic {
+                Determinism::Enforced
+            } else {
+                Determinism::Relaxed
+            },
+        );
+        match result.result {
+            Ok(v) => Ok(v.data),
+            Err(err) => Err(format!("{err:?}")),
+        }
+    }
 }
