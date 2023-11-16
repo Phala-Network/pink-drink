@@ -1,6 +1,6 @@
 [package]
 name = "drink-pink-runtime"
-version = "1.2.3"
+version = "1.2.4"
 edition = "2021"
 description = "A drink runtime implementation for Phat Contract"
 license = "Apache-2.0"
