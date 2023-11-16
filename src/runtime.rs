@@ -1,7 +1,7 @@
 mod extension;
 mod pallet_pink;
 
-use crate::types::{AccountId, Balance, BlockNumber, Hash, Hashing, Nonce};
+use crate::types::{AccountId, Balance, BlockNumber, ExecMode, Hash, Hashing, Nonce};
 use drink::runtime::{AccountIdFor, Runtime, RuntimeMetadataPrefixed};
 use frame_support::sp_runtime::{self, BuildStorage as _};
 use frame_support::{
@@ -170,7 +170,7 @@ impl Config for PinkRuntime {
 }
 
 /// Default initial balance for the default account.
-pub const INITIAL_BALANCE: u128 = 1_000_000_000_000_000;
+pub const INITIAL_BALANCE: u128 = 1_000_000_000_000_000_000_000;
 
 impl Runtime for PinkRuntime {
     fn initialize_storage(storage: &mut sp_runtime::Storage) -> Result<(), String> {
@@ -182,6 +182,13 @@ impl Runtime for PinkRuntime {
 
     fn default_actor() -> AccountIdFor<Self> {
         AccountId::new([1u8; 32])
+    }
+
+    fn initialize_block(height: BlockNumber, _parent_hash: Hash) -> Result<(), String> {
+        if height != 1 {
+            return Ok(());
+        }
+        Self::setup_cluster()
     }
 
     fn get_metadata() -> RuntimeMetadataPrefixed {
@@ -196,7 +203,7 @@ impl Runtime for PinkRuntime {
 }
 
 impl PinkRuntime {
-    pub fn setup_cluster() -> Result<(), String> {
+    fn setup_cluster() -> Result<(), String> {
         type PalletPink = Pink;
         PalletPink::set_cluster_id(Hash::zero());
         PalletPink::set_gas_price(0);
@@ -235,7 +242,7 @@ impl PinkRuntime {
         let qjs_code_hash = Self::upload_code(owner.clone(), qjs_code, false)
             .map_err(|err| format!("FailedToUploadQjsCode: {err:?}"))?;
         let input_data = (selector_set_driver, "JsDelegate", qjs_code_hash).encode();
-        Self::call(
+        let _ = Self::call(
             owner.clone(),
             system_address.clone(),
             0,
@@ -245,11 +252,12 @@ impl PinkRuntime {
             true,
         )
         .map_err(|err| format!("FailedToCallSetDriver: {err:?}"))?;
+
         let qjs2_code = include_bytes!("../artifacts/qjs2.wasm").to_vec();
         let qjs2_code_hash = Self::upload_code(owner.clone(), qjs2_code, false)
             .map_err(|err| format!("FailedToUploadQjs2Code: {err:?}"))?;
         let input_data = (selector_set_driver, "JsDelegate2", qjs2_code_hash).encode();
-        let data = Self::call(
+        let _ = Self::call(
             owner.clone(),
             system_address,
             0,
@@ -262,7 +270,7 @@ impl PinkRuntime {
         Ok(())
     }
 
-    pub fn execute_in_mode<T>(mode: crate::ExecMode, f: impl FnOnce() -> T) -> T {
+    pub(crate) fn execute_in_mode<T>(mode: ExecMode, f: impl FnOnce() -> T) -> T {
         extension::exec_in_mode(mode, f)
     }
 

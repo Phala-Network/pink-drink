@@ -1,8 +1,12 @@
+pub use drink;
+
+pub use ink_helper::{Callable, DeployBundle, Deployable, SessionExt};
+pub use runtime::PinkRuntime;
+
 mod runtime;
 mod types;
 
-pub use runtime::PinkRuntime;
-pub use types::ExecMode;
+mod ink_helper;
 
 pub fn version() -> (u32, u32) {
     let major = env!("CARGO_PKG_VERSION_MAJOR")

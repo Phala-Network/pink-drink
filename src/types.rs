@@ -14,7 +14,6 @@ pub type Nonce = u64;
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum ExecMode {
     Query,
-    Estimating,
     Transaction,
 }
 
