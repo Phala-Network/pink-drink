@@ -1,6 +1,3 @@
-mod extension;
-mod pallet_pink;
-
 use crate::types::{AccountId, Balance, BlockNumber, ExecMode, Hash, Hashing, Nonce};
 use drink::runtime::{AccountIdFor, Runtime, RuntimeMetadataPrefixed};
 use frame_support::sp_runtime::{self, BuildStorage as _};
@@ -23,6 +20,9 @@ use sp_runtime::{
 };
 
 pub use pink_extension::{EcdhPublicKey, HookPoint, Message, OspMessage, PinkEvent};
+
+mod extension;
+mod pallet_pink;
 
 type Block = sp_runtime::generic::Block<
     sp_runtime::generic::Header<BlockNumber, Hashing>,

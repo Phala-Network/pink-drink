@@ -1,4 +1,5 @@
-use crate::{types::ExecMode, PinkRuntime};
+use crate::{types::ExecMode, PinkRuntime, Result};
+
 use ::ink::{
     env::{
         call::{
@@ -27,7 +28,7 @@ pub trait SessionExt {
     fn actor(&mut self) -> AccountId;
     fn query<T>(&mut self, f: impl FnOnce() -> T) -> T;
     fn tx<T>(&mut self, f: impl FnOnce() -> T) -> T;
-    fn set_driver<A: Encode>(&mut self, name: &str, contract: &A) -> Result<(), String>;
+    fn set_driver<A: Encode>(&mut self, name: &str, contract: &A) -> Result<()>;
 }
 
 impl SessionExt for PinkSession {
@@ -44,7 +45,7 @@ impl SessionExt for PinkSession {
     fn tx<T>(&mut self, f: impl FnOnce() -> T) -> T {
         PinkRuntime::execute_in_mode(ExecMode::Transaction, || self.sandbox().execute_with(f))
     }
-    fn set_driver<A: Encode>(&mut self, name: &str, contract: &A) -> Result<(), String> {
+    fn set_driver<A: Encode>(&mut self, name: &str, contract: &A) -> Result<()> {
         let caller = self.actor();
         self.tx(|| {
             let system_address =
@@ -61,7 +62,7 @@ impl SessionExt for PinkSession {
                 true,
             )
             .map(|_| ())
-            .map_err(|err| format!("FailedToCallSetDriver: {err:?}"))
+            .map_err(|err| format!("FailedToCallSetDriver: {err:?}").into())
         })
     }
 }
@@ -72,17 +73,17 @@ pub trait DeployBundle {
         self,
         bundle: &ContractBundle,
         session: &mut PinkSession,
-    ) -> Result<Self::Contract, String>;
+    ) -> Result<Self::Contract>;
 }
 pub trait Deployable {
     type Contract;
-    fn deploy(self, session: &mut PinkSession) -> Result<Self::Contract, String>;
+    fn deploy(self, session: &mut PinkSession) -> Result<Self::Contract>;
 }
 
 pub trait Callable {
     type Ret;
-    fn submit_tx(self, session: &mut PinkSession) -> Result<Self::Ret, String>;
-    fn query(self, session: &mut PinkSession) -> Result<Self::Ret, String>;
+    fn submit_tx(self, session: &mut PinkSession) -> Result<Self::Ret>;
+    fn query(self, session: &mut PinkSession) -> Result<Self::Ret>;
 }
 
 impl<Env, Contract, Args, Salt> DeployBundle
@@ -108,11 +109,36 @@ where
         self,
         bundle: &ContractBundle,
         session: &mut PinkSession,
-    ) -> Result<Self::Contract, String> {
+    ) -> Result<Self::Contract> {
         let caller = session.actor();
         let code_hash =
             session.tx(|| PinkRuntime::upload_code(caller.clone(), bundle.wasm.clone(), true))?;
         self.code_hash(code_hash.0.into()).deploy(session)
+    }
+}
+impl<Env, Contract, Args> DeployBundle
+    for CreateBuilder<
+        Env,
+        Contract,
+        Unset<Hash>,
+        Unset<u64>,
+        Unset<Balance>,
+        Set<ExecutionInput<Args>>,
+        Unset<ink::env::call::state::Salt>,
+        Set<ReturnType<Contract>>,
+    >
+where
+    Env: Environment<Hash = Hash, Balance = Balance>,
+    Contract: FromAccountId<Env>,
+    Args: Encode,
+{
+    type Contract = Contract;
+    fn deploy_bundle(
+        self,
+        bundle: &ContractBundle,
+        session: &mut PinkSession,
+    ) -> Result<Self::Contract> {
+        self.salt_bytes(Vec::new()).deploy_bundle(bundle, session)
     }
 }
 
@@ -135,7 +161,7 @@ where
 {
     type Contract = Contract;
 
-    fn deploy(self, session: &mut PinkSession) -> Result<Self::Contract, String> {
+    fn deploy(self, session: &mut PinkSession) -> Result<Self::Contract> {
         let caller = session.actor();
         let constructor = self.endowment(0).gas_limit(DEFAULT_GAS_LIMIT);
         let params = constructor.params();
@@ -169,11 +195,11 @@ where
 {
     type Ret = Ret;
 
-    fn submit_tx(self, session: &mut PinkSession) -> Result<Self::Ret, String> {
+    fn submit_tx(self, session: &mut PinkSession) -> Result<Self::Ret> {
         session.tx(|| call(self, true))
     }
 
-    fn query(self, session: &mut PinkSession) -> Result<Self::Ret, String> {
+    fn query(self, session: &mut PinkSession) -> Result<Self::Ret> {
         session.query(|| call(self, false))
     }
 }
@@ -181,7 +207,7 @@ where
 fn call<Env, Args, Ret>(
     call_builder: CallBuilder<Env, Set<Call<Env>>, Set<ExecutionInput<Args>>, Set<ReturnType<Ret>>>,
     deterministic: bool,
-) -> Result<Ret, String>
+) -> Result<Ret>
 where
     Env: Environment,
     Args: Encode,

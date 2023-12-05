@@ -1,8 +1,10 @@
 pub use drink;
 
+pub use error::{Error, Result};
 pub use ink_helper::{Callable, DeployBundle, Deployable, SessionExt};
 pub use runtime::PinkRuntime;
 
+mod error;
 mod runtime;
 mod types;
 
