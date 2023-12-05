@@ -3,7 +3,7 @@ use drink::runtime::{AccountIdFor, Runtime, RuntimeMetadataPrefixed};
 use frame_support::sp_runtime::{self, BuildStorage as _};
 use frame_support::{
     parameter_types,
-    traits::{ConstBool, ConstU32},
+    traits::{ConstBool, ConstU32, Randomness},
     weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight},
 };
 use pallet_contracts::{
@@ -133,7 +133,13 @@ parameter_types! {
     };
     pub CodeHashLockupDepositPercent: Perbill = Perbill::from_percent(30);
 }
-use drink::runtime::minimal::SandboxRandomness;
+
+pub enum SandboxRandomness {}
+impl Randomness<Hash, u32> for SandboxRandomness {
+    fn random(_subject: &[u8]) -> (Hash, u32) {
+        unreachable!("No randomness")
+    }
+}
 
 impl Config for PinkRuntime {
     type Time = Timestamp;
