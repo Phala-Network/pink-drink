@@ -241,6 +241,10 @@ impl PinkExtBackend for CallInQuery {
             PalletPink::last_event_block_hash().into(),
         ))
     }
+
+    fn js_eval(&self, _codes: Vec<ext::JsCode>, _args: Vec<String>) -> Result<ext::JsValue, Self::Error> {
+        return Ok(ext::JsValue::Exception("js_eval is not supported".to_string()));
+    }
 }
 
 struct CallInCommand {
@@ -404,6 +408,10 @@ impl PinkExtBackend for CallInCommand {
 
     fn current_event_chain_head(&self) -> Result<(u64, Hash), Self::Error> {
         self.as_in_query.current_event_chain_head()
+    }
+
+    fn js_eval(&self, _codes: Vec<ext::JsCode>, _args: Vec<String>) -> Result<ext::JsValue, Self::Error> {
+        return Ok(ext::JsValue::Exception("js_eval is not supported".to_string()));
     }
 }
 
