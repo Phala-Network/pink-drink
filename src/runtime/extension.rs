@@ -1,4 +1,6 @@
 use std::borrow::Cow;
+use std::time::Duration;
+use tokio::time::timeout;
 
 use frame_support::sp_runtime::{AccountId32, DispatchError};
 use frame_support::traits::Currency;
@@ -266,10 +268,12 @@ impl PinkExtBackend for CallInQuery {
         let vital_capacity = 100_000_000_000_u64;
         let max_memory_pages = 256;
         let run = crate::sidevm_runner::run(vital_capacity, max_memory_pages, runtime_code, args);
-        crate::blocking::block_on(run).map_err(|err| {
-            error!(target: "pink", "Failed to run js: {err:?}");
-            DispatchError::Other("Failed to run js")
-        })
+        let run = async { timeout(Duration::from_secs(10), run).await };
+        match crate::blocking::block_on(run) {
+            Ok(Ok(value)) => Ok(value),
+            Ok(Err(err)) => Ok(ext::JsValue::Exception(format!("{:?}", err))),
+            Err(_) => Ok(ext::JsValue::Exception("Sidevm execution timeout".to_string())),
+        }
     }
 }
 
