@@ -1,6 +1,6 @@
 [package]
 name = "drink-pink-runtime"
-version = "1.2.10"
+version = "1.2.11"
 edition = "2021"
 description = "A drink runtime implementation for Phat Contract"
 license = "Apache-2.0"
@@ -9,6 +9,7 @@ keywords = ["phat-contract", "pink", "ink"]
 [dependencies]
 log = "0.4.20"
 ink = "4"
+hex = "0.4.3"
 drink = "0.8.0"
 pink-extension = "0.5.1"
 pink-extension-runtime = "0.5.1"
@@ -22,3 +23,7 @@ pallet-contracts = { version = "22.0.1", package = "pallet-contracts-for-drink" 
 pallet-timestamp = "22.0.0"
 environmental = "1.1.4"
 pallet-contracts-primitives = "26.0.0"
+sidevm-host-runtime = "0.1"
+anyhow = "1.0"
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"

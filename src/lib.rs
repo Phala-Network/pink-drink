@@ -9,6 +9,8 @@ mod runtime;
 mod types;
 
 mod ink_helper;
+mod sidevm_runner;
+mod blocking;
 
 pub fn version() -> (u32, u32) {
     let major = env!("CARGO_PKG_VERSION_MAJOR")

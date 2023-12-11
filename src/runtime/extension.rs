@@ -242,8 +242,34 @@ impl PinkExtBackend for CallInQuery {
         ))
     }
 
-    fn js_eval(&self, _codes: Vec<ext::JsCode>, _args: Vec<String>) -> Result<ext::JsValue, Self::Error> {
-        return Ok(ext::JsValue::Exception("js_eval is not supported".to_string()));
+    fn js_eval(
+        &self,
+        codes: Vec<ext::JsCode>,
+        script_args: Vec<String>,
+    ) -> Result<ext::JsValue, Self::Error> {
+        let runtime_code = PalletPink::js_runtime();
+        let mut args = vec!["phatjs".to_string()];
+        for code in codes {
+            match code {
+                ext::JsCode::Bytecode(bytes) => {
+                    args.push("-b".to_string());
+                    args.push(hex::encode(bytes));
+                }
+                ext::JsCode::Source(src) => {
+                    args.push("-c".to_string());
+                    args.push(src);
+                }
+            }
+        }
+        args.push("--".to_string());
+        args.extend(script_args);
+        let vital_capacity = 100_000_000_000_u64;
+        let max_memory_pages = 256;
+        let run = crate::sidevm_runner::run(vital_capacity, max_memory_pages, runtime_code, args);
+        crate::blocking::block_on(run).map_err(|err| {
+            error!(target: "pink", "Failed to run js: {err:?}");
+            DispatchError::Other("Failed to run js")
+        })
     }
 }
 
@@ -410,8 +436,14 @@ impl PinkExtBackend for CallInCommand {
         self.as_in_query.current_event_chain_head()
     }
 
-    fn js_eval(&self, _codes: Vec<ext::JsCode>, _args: Vec<String>) -> Result<ext::JsValue, Self::Error> {
-        return Ok(ext::JsValue::Exception("js_eval is not supported".to_string()));
+    fn js_eval(
+        &self,
+        _codes: Vec<ext::JsCode>,
+        _args: Vec<String>,
+    ) -> Result<ext::JsValue, Self::Error> {
+        return Ok(ext::JsValue::Exception(
+            "js_eval is not supported".to_string(),
+        ));
     }
 }
 
