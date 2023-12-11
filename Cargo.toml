@@ -1,6 +1,6 @@
 [package]
 name = "drink-pink-runtime"
-version = "1.2.9"
+version = "1.2.10"
 edition = "2021"
 description = "A drink runtime implementation for Phat Contract"
 license = "Apache-2.0"
@@ -10,7 +10,7 @@ keywords = ["phat-contract", "pink", "ink"]
 log = "0.4.20"
 ink = "4"
 drink = "0.8.0"
-pink-extension = "0.5.0"
+pink-extension = "0.5.1"
 pink-extension-runtime = "0.5.1"
 scale = { version = "3.6.5", package = "parity-scale-codec" }
 scale-info = "2.10.0"
