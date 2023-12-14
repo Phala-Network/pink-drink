@@ -22,6 +22,10 @@ use scale::{Decode, Encode};
 type PinkSession = Session<PinkRuntime>;
 type AccountId = AccountIdFor<PinkRuntime>;
 
+pub fn code_hash(wasm: &[u8]) -> [u8; 32] {
+    sp_core::hashing::blake2_256(wasm)
+}
+
 const DEFAULT_GAS_LIMIT: u64 = 1_000_000_000_000_000;
 
 pub trait SessionExt {
@@ -73,7 +77,15 @@ pub trait DeployBundle {
         self,
         bundle: &ContractBundle,
         session: &mut PinkSession,
-    ) -> Result<Self::Contract>;
+    ) -> Result<Self::Contract>
+    where
+        Self: Sized,
+    {
+        self.deploy_wasm(&bundle.wasm, session)
+    }
+    fn deploy_wasm(self, wasm: &[u8], session: &mut PinkSession) -> Result<Self::Contract>
+    where
+        Self: Sized;
 }
 pub trait Deployable {
     type Contract;
@@ -105,14 +117,10 @@ where
 {
     type Contract = Contract;
 
-    fn deploy_bundle(
-        self,
-        bundle: &ContractBundle,
-        session: &mut PinkSession,
-    ) -> Result<Self::Contract> {
+    fn deploy_wasm(self, wasm: &[u8], session: &mut PinkSession) -> Result<Self::Contract> {
         let caller = session.actor();
         let code_hash =
-            session.tx(|| PinkRuntime::upload_code(caller.clone(), bundle.wasm.clone(), true))?;
+            session.tx(|| PinkRuntime::upload_code(caller.clone(), wasm.to_vec(), true))?;
         self.code_hash(code_hash.0.into()).deploy(session)
     }
 }
@@ -133,12 +141,8 @@ where
     Args: Encode,
 {
     type Contract = Contract;
-    fn deploy_bundle(
-        self,
-        bundle: &ContractBundle,
-        session: &mut PinkSession,
-    ) -> Result<Self::Contract> {
-        self.salt_bytes(Vec::new()).deploy_bundle(bundle, session)
+    fn deploy_wasm(self, wasm: &[u8], session: &mut PinkSession) -> Result<Self::Contract> {
+        self.salt_bytes(Vec::new()).deploy_wasm(wasm, session)
     }
 }
 

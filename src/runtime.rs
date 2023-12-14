@@ -1,3 +1,4 @@
+use crate::runtime::pallet_pink::JsRuntime;
 use crate::types::{AccountId, Balance, BlockNumber, ExecMode, Hash, Hashing, Nonce};
 use drink::runtime::{AccountIdFor, Runtime, RuntimeMetadataPrefixed};
 use frame_support::sp_runtime::{self, BuildStorage as _};
@@ -235,7 +236,7 @@ impl PinkRuntime {
             pallet_contracts::DebugInfo::UnsafeDebug,
             pallet_contracts::CollectEvents::Skip,
         );
-        log::info!("Contract instantiation result: {:?}", &result.result);
+        log::debug!("System instantiation result: {:?}", &result.result);
         let system_address = result
             .result
             .expect("Failed to instantiate system contract")
@@ -273,6 +274,10 @@ impl PinkRuntime {
             true,
         )
         .map_err(|err| format!("FailedToCallSetDriver: {err:?}"))?;
+
+        // The js runtime code that powers the pink::ext().js_eval() function.
+        let phatjs_code = include_bytes!("../artifacts/phatjs-stripped.wasm").to_vec();
+        JsRuntime::<PinkRuntime>::put(phatjs_code);
         Ok(())
     }
 

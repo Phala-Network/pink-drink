@@ -1,4 +1,6 @@
 use std::borrow::Cow;
+use std::time::Duration;
+use tokio::time::timeout;
 
 use frame_support::sp_runtime::{AccountId32, DispatchError};
 use frame_support::traits::Currency;
@@ -242,8 +244,36 @@ impl PinkExtBackend for CallInQuery {
         ))
     }
 
-    fn js_eval(&self, _codes: Vec<ext::JsCode>, _args: Vec<String>) -> Result<ext::JsValue, Self::Error> {
-        return Ok(ext::JsValue::Exception("js_eval is not supported".to_string()));
+    fn js_eval(
+        &self,
+        codes: Vec<ext::JsCode>,
+        script_args: Vec<String>,
+    ) -> Result<ext::JsValue, Self::Error> {
+        let runtime_code = PalletPink::js_runtime();
+        let mut args = vec!["phatjs".to_string()];
+        for code in codes {
+            match code {
+                ext::JsCode::Bytecode(bytes) => {
+                    args.push("-b".to_string());
+                    args.push(hex::encode(bytes));
+                }
+                ext::JsCode::Source(src) => {
+                    args.push("-c".to_string());
+                    args.push(src);
+                }
+            }
+        }
+        args.push("--".to_string());
+        args.extend(script_args);
+        let vital_capacity = 100_000_000_000_u64;
+        let max_memory_pages = 256;
+        let run = crate::sidevm_runner::run(vital_capacity, max_memory_pages, runtime_code, args);
+        let run = async { timeout(Duration::from_secs(10), run).await };
+        match crate::blocking::block_on(run) {
+            Ok(Ok(value)) => Ok(value),
+            Ok(Err(err)) => Ok(ext::JsValue::Exception(format!("{:?}", err))),
+            Err(_) => Ok(ext::JsValue::Exception("Sidevm execution timeout".to_string())),
+        }
     }
 }
 
@@ -410,8 +440,14 @@ impl PinkExtBackend for CallInCommand {
         self.as_in_query.current_event_chain_head()
     }
 
-    fn js_eval(&self, _codes: Vec<ext::JsCode>, _args: Vec<String>) -> Result<ext::JsValue, Self::Error> {
-        return Ok(ext::JsValue::Exception("js_eval is not supported".to_string()));
+    fn js_eval(
+        &self,
+        _codes: Vec<ext::JsCode>,
+        _args: Vec<String>,
+    ) -> Result<ext::JsValue, Self::Error> {
+        return Ok(ext::JsValue::Exception(
+            "js_eval is not supported".to_string(),
+        ));
     }
 }
 
