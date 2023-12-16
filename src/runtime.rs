@@ -21,6 +21,8 @@ use sp_runtime::{
 };
 
 pub use pink_extension::{EcdhPublicKey, HookPoint, Message, OspMessage, PinkEvent};
+pub type ContractExecResult =
+    pallet_contracts_primitives::ContractExecResult<Balance, drink::EventRecordOf<PinkRuntime>>;
 
 mod extension;
 mod pallet_pink;
@@ -364,5 +366,31 @@ impl PinkRuntime {
             Ok(v) => Ok(v.data),
             Err(err) => Err(format!("{err:?}")),
         }
+    }
+
+    pub fn bare_call(
+        origin: AccountId,
+        dest: AccountId,
+        value: Balance,
+        gas_limit: u64,
+        storage_deposit_limit: Option<Balance>,
+        data: Vec<u8>,
+        deterministic: bool,
+    ) -> ContractExecResult {
+        Contracts::bare_call(
+            origin,
+            dest,
+            value,
+            Weight::from_parts(gas_limit, u64::MAX),
+            storage_deposit_limit,
+            data,
+            DebugInfo::Skip,
+            CollectEvents::Skip,
+            if deterministic {
+                Determinism::Enforced
+            } else {
+                Determinism::Relaxed
+            },
+        )
     }
 }

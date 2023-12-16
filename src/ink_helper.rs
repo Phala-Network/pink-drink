@@ -1,4 +1,4 @@
-use crate::{types::ExecMode, PinkRuntime, Result};
+use crate::{runtime::ContractExecResult, types::ExecMode, PinkRuntime, Result};
 
 use ::ink::{
     env::{
@@ -95,7 +95,9 @@ pub trait Deployable {
 pub trait Callable {
     type Ret;
     fn submit_tx(self, session: &mut PinkSession) -> Result<Self::Ret>;
+    fn bare_tx(self, session: &mut PinkSession) -> ContractExecResult;
     fn query(self, session: &mut PinkSession) -> Result<Self::Ret>;
+    fn bare_query(self, session: &mut PinkSession) -> ContractExecResult;
 }
 
 impl<Env, Contract, Args, Salt> DeployBundle
@@ -193,7 +195,7 @@ where
 impl<Env, Args: Encode, Ret: Decode> Callable
     for CallBuilder<Env, Set<Call<Env>>, Set<ExecutionInput<Args>>, Set<ReturnType<Ret>>>
 where
-    Env: Environment,
+    Env: Environment<Balance = Balance>,
     Ret: Decode,
     Args: Encode,
 {
@@ -202,9 +204,14 @@ where
     fn submit_tx(self, session: &mut PinkSession) -> Result<Self::Ret> {
         session.tx(|| call(self, true))
     }
-
+    fn bare_tx(self, session: &mut PinkSession) -> ContractExecResult {
+        session.tx(|| bare_call(self, false))
+    }
     fn query(self, session: &mut PinkSession) -> Result<Self::Ret> {
         session.query(|| call(self, false))
+    }
+    fn bare_query(self, session: &mut PinkSession) -> ContractExecResult {
+        session.query(|| bare_call(self, false))
     }
 }
 
@@ -213,27 +220,46 @@ fn call<Env, Args, Ret>(
     deterministic: bool,
 ) -> Result<Ret>
 where
-    Env: Environment,
+    Env: Environment<Balance = Balance>,
     Args: Encode,
     Ret: Decode,
+{
+    let result = bare_call(call_builder, deterministic);
+    let result = result
+        .result
+        .map_err(|e| format!("Failed to execute call: {e:?}"))?;
+    let ret = MessageResult::<Ret>::decode(&mut &result.data[..])
+        .map_err(|e| format!("Failed to decode result: {}", e))?
+        .map_err(|e| format!("Failed to execute call: {}", e))?;
+    Ok(ret)
+}
+
+fn bare_call<Env, Args, Ret>(
+    call_builder: CallBuilder<Env, Set<Call<Env>>, Set<ExecutionInput<Args>>, Set<ReturnType<Ret>>>,
+    deterministic: bool,
+) -> ContractExecResult
+where
+    Env: Environment<Balance = Balance>,
+    Args: Encode,
 {
     let origin = PinkRuntime::default_actor();
     let params = call_builder.params();
     let data = params.exec_input().encode();
     let callee = params.callee();
-    let address: [u8; 32] = callee.as_ref().try_into().or(Err("Invalid callee"))?;
+    let address: [u8; 32] = callee.as_ref().try_into().expect("Invalid callee");
+    let gas_limit = if params.gas_limit() == 0 {
+        DEFAULT_GAS_LIMIT
+    } else {
+        params.gas_limit()
+    };
 
-    let result = PinkRuntime::call(
+    PinkRuntime::bare_call(
         origin,
         address.into(),
-        0,
-        DEFAULT_GAS_LIMIT,
+        *params.transferred_value(),
+        gas_limit,
         None,
         data,
         deterministic,
-    )?;
-    let ret = MessageResult::<Ret>::decode(&mut &result[..])
-        .map_err(|e| format!("Failed to decode result: {}", e))?
-        .map_err(|e| format!("Failed to execute call: {}", e))?;
-    Ok(ret)
+    )
 }
