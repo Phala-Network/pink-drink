@@ -26,7 +26,8 @@ pub fn code_hash(wasm: &[u8]) -> [u8; 32] {
     sp_core::hashing::blake2_256(wasm)
 }
 
-const DEFAULT_GAS_LIMIT: u64 = 1_000_000_000_000_000;
+const DEFAULT_QUWEY_GAS_LIMIT: u64 = 1_0_000_000_000_000;
+const DEFAULT_TX_GAS_LIMIT: u64 = 500_000_000_000;
 
 pub trait SessionExt {
     fn actor(&mut self) -> AccountId;
@@ -169,7 +170,7 @@ where
 
     fn deploy(self, session: &mut PinkSession) -> Result<Self::Contract> {
         let caller = session.actor();
-        let constructor = self.endowment(0).gas_limit(DEFAULT_GAS_LIMIT);
+        let constructor = self.endowment(0).gas_limit(DEFAULT_TX_GAS_LIMIT);
         let params = constructor.params();
         let code_hash: &[u8] = params.code_hash().as_ref();
         let code_hash = sp_core::H256(code_hash.try_into().expect("Hash convert failed"));
@@ -247,10 +248,12 @@ where
     let data = params.exec_input().encode();
     let callee = params.callee();
     let address: [u8; 32] = callee.as_ref().try_into().expect("Invalid callee");
-    let gas_limit = if params.gas_limit() == 0 {
-        DEFAULT_GAS_LIMIT
-    } else {
+    let gas_limit = if params.gas_limit() > 0 {
         params.gas_limit()
+    } else if deterministic {
+        DEFAULT_TX_GAS_LIMIT
+    } else {
+        DEFAULT_QUWEY_GAS_LIMIT
     };
 
     PinkRuntime::bare_call(
