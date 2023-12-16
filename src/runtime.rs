@@ -23,6 +23,11 @@ use sp_runtime::{
 pub use pink_extension::{EcdhPublicKey, HookPoint, Message, OspMessage, PinkEvent};
 pub type ContractExecResult =
     pallet_contracts_primitives::ContractExecResult<Balance, drink::EventRecordOf<PinkRuntime>>;
+pub type ContractInstantiateResult = pallet_contracts_primitives::ContractInstantiateResult<
+    AccountId,
+    Balance,
+    drink::EventRecordOf<PinkRuntime>,
+>;
 
 mod extension;
 mod pallet_pink;
@@ -315,16 +320,14 @@ impl PinkRuntime {
         data: Vec<u8>,
         salt: Vec<u8>,
     ) -> Result<AccountId, String> {
-        let result = Contracts::bare_instantiate(
+        let result = Self::bare_instantiate(
             origin,
             value,
-            Weight::from_parts(gas_limit, u64::MAX),
+            gas_limit,
             storage_deposit_limit,
-            Code::Existing(code_hash),
+            code_hash,
             data,
             salt,
-            DebugInfo::Skip,
-            CollectEvents::Skip,
         );
         match result.result {
             Ok(v) => {
@@ -338,6 +341,28 @@ impl PinkRuntime {
         }
     }
 
+    pub fn bare_instantiate(
+        origin: AccountId,
+        value: Balance,
+        gas_limit: u64,
+        storage_deposit_limit: Option<Balance>,
+        code_hash: Hash,
+        data: Vec<u8>,
+        salt: Vec<u8>,
+    ) -> ContractInstantiateResult {
+        Contracts::bare_instantiate(
+            origin,
+            value,
+            Weight::from_parts(gas_limit, u64::MAX),
+            storage_deposit_limit,
+            Code::Existing(code_hash),
+            data,
+            salt,
+            DebugInfo::Skip,
+            CollectEvents::Skip,
+        )
+    }
+
     pub fn call(
         origin: AccountId,
         dest: AccountId,
@@ -347,20 +372,14 @@ impl PinkRuntime {
         data: Vec<u8>,
         deterministic: bool,
     ) -> Result<Vec<u8>, String> {
-        let result = Contracts::bare_call(
+        let result = Self::bare_call(
             origin,
             dest,
             value,
-            Weight::from_parts(gas_limit, u64::MAX),
+            gas_limit,
             storage_deposit_limit,
             data,
-            DebugInfo::Skip,
-            CollectEvents::Skip,
-            if deterministic {
-                Determinism::Enforced
-            } else {
-                Determinism::Relaxed
-            },
+            deterministic,
         );
         match result.result {
             Ok(v) => Ok(v.data),

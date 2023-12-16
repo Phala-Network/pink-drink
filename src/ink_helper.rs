@@ -1,4 +1,8 @@
-use crate::{runtime::ContractExecResult, types::ExecMode, PinkRuntime, Result};
+use crate::{
+    runtime::{ContractExecResult, ContractInstantiateResult},
+    types::ExecMode,
+    PinkRuntime, Result,
+};
 
 use ::ink::{
     env::{
@@ -87,10 +91,16 @@ pub trait DeployBundle {
     fn deploy_wasm(self, wasm: &[u8], session: &mut PinkSession) -> Result<Self::Contract>
     where
         Self: Sized;
+    fn bare_deploy(
+        self,
+        wasm: &[u8],
+        session: &mut PinkSession,
+    ) -> Result<ContractInstantiateResult>;
 }
 pub trait Deployable {
     type Contract;
     fn deploy(self, session: &mut PinkSession) -> Result<Self::Contract>;
+    fn bare_deploy(self, session: &mut PinkSession) -> ContractInstantiateResult;
 }
 
 pub trait Callable {
@@ -121,12 +131,21 @@ where
     type Contract = Contract;
 
     fn deploy_wasm(self, wasm: &[u8], session: &mut PinkSession) -> Result<Self::Contract> {
+        into_contract(self.bare_deploy(wasm, session)?)
+    }
+
+    fn bare_deploy(
+        self,
+        wasm: &[u8],
+        session: &mut PinkSession,
+    ) -> Result<ContractInstantiateResult> {
         let caller = session.actor();
         let code_hash =
             session.tx(|| PinkRuntime::upload_code(caller.clone(), wasm.to_vec(), true))?;
-        self.code_hash(code_hash.0.into()).deploy(session)
+        Ok(self.code_hash(code_hash.0.into()).bare_deploy(session))
     }
 }
+
 impl<Env, Contract, Args> DeployBundle
     for CreateBuilder<
         Env,
@@ -146,6 +165,13 @@ where
     type Contract = Contract;
     fn deploy_wasm(self, wasm: &[u8], session: &mut PinkSession) -> Result<Self::Contract> {
         self.salt_bytes(Vec::new()).deploy_wasm(wasm, session)
+    }
+    fn bare_deploy(
+        self,
+        wasm: &[u8],
+        session: &mut PinkSession,
+    ) -> Result<ContractInstantiateResult> {
+        self.salt_bytes(Vec::new()).bare_deploy(wasm, session)
     }
 }
 
@@ -169,6 +195,9 @@ where
     type Contract = Contract;
 
     fn deploy(self, session: &mut PinkSession) -> Result<Self::Contract> {
+        into_contract(self.bare_deploy(session))
+    }
+    fn bare_deploy(self, session: &mut PinkSession) -> ContractInstantiateResult {
         let caller = session.actor();
         let constructor = self.endowment(0).gas_limit(DEFAULT_TX_GAS_LIMIT);
         let params = constructor.params();
@@ -176,8 +205,8 @@ where
         let code_hash = sp_core::H256(code_hash.try_into().expect("Hash convert failed"));
         let input_data = params.exec_input().encode();
 
-        let account_id = session.tx(|| {
-            PinkRuntime::instantiate(
+        session.tx(|| {
+            PinkRuntime::bare_instantiate(
                 caller,
                 0,
                 params.gas_limit(),
@@ -186,11 +215,28 @@ where
                 input_data,
                 params.salt_bytes().as_ref().to_vec(),
             )
-        })?;
-        Ok(Contract::from_account_id(
-            Decode::decode(&mut &account_id.encode()[..]).expect("Failed to decode account id"),
-        ))
+        })
     }
+}
+
+fn into_contract<Contract, Env>(result: ContractInstantiateResult) -> Result<Contract>
+where
+    Contract: FromAccountId<Env>,
+    Env: Environment,
+{
+    let account_id = match result.result {
+        Ok(v) => {
+            if v.result.did_revert() {
+                return Err("Contract instantiation reverted".into());
+            } else {
+                v.account_id
+            }
+        }
+        Err(err) => return Err(format!("{err:?}").into()),
+    };
+    let account_id =
+        Decode::decode(&mut &account_id.encode()[..]).expect("Failed to decode account id");
+    Ok(Contract::from_account_id(account_id))
 }
 
 impl<Env, Args: Encode, Ret: Decode> Callable
