@@ -30,8 +30,8 @@ pub fn code_hash(wasm: &[u8]) -> [u8; 32] {
     sp_core::hashing::blake2_256(wasm)
 }
 
-const DEFAULT_QUWEY_GAS_LIMIT: u64 = 1_0_000_000_000_000;
-const DEFAULT_TX_GAS_LIMIT: u64 = 500_000_000_000;
+const DEFAULT_QUERY_GAS_LIMIT: u64 = 50_000_000_000_000;
+const DEFAULT_TX_GAS_LIMIT: u64 = 2500_000_000_000;
 
 pub trait SessionExt {
     fn actor(&mut self) -> AccountId;
@@ -299,7 +299,7 @@ where
     } else if deterministic {
         DEFAULT_TX_GAS_LIMIT
     } else {
-        DEFAULT_QUWEY_GAS_LIMIT
+        DEFAULT_QUERY_GAS_LIMIT
     };
 
     PinkRuntime::bare_call(
