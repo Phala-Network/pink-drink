@@ -15,7 +15,7 @@ use ::ink::{
     primitives::Hash,
 };
 use drink::{errors::MessageResult, runtime::AccountIdFor, session::Session, ContractBundle};
-use pink_extension::Balance;
+use pink::Balance;
 use scale::{Decode, Encode};
 
 type PinkSession = Session<PinkRuntime>;

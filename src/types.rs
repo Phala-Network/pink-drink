@@ -2,8 +2,6 @@ use frame_support::sp_runtime;
 
 use sp_runtime::{traits::BlakeTwo256, AccountId32};
 
-pub use frame_support::weights::Weight;
-
 pub type Hash = sp_core::H256;
 pub type Hashing = BlakeTwo256;
 pub type AccountId = AccountId32;
