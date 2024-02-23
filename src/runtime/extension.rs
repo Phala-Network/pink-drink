@@ -12,7 +12,9 @@ use pink::{
     chain_extension::{
         self as ext, HttpRequest, HttpResponse, PinkExtBackend, SigType, StorageQuotaExceeded,
     },
-    dispatch_ext_call, CacheOp, EcdhPublicKey, EcdsaPublicKey, EcdsaSignature, Hash, PinkEvent,
+    dispatch_ext_call,
+    types::sgx::SgxQuote,
+    CacheOp, EcdhPublicKey, EcdsaPublicKey, EcdsaSignature, Hash, PinkEvent,
 };
 use pink_chain_extension::{DefaultPinkExtension, PinkRuntimeEnv};
 use scale::Encode;
@@ -272,8 +274,16 @@ impl PinkExtBackend for CallInQuery {
         match crate::blocking::block_on(run) {
             Ok(Ok(value)) => Ok(value),
             Ok(Err(err)) => Ok(ext::JsValue::Exception(format!("{:?}", err))),
-            Err(_) => Ok(ext::JsValue::Exception("Sidevm execution timeout".to_string())),
+            Err(_) => Ok(ext::JsValue::Exception(
+                "Sidevm execution timeout".to_string(),
+            )),
         }
+    }
+
+    fn worker_sgx_quote(&self) -> Result<Option<SgxQuote>, Self::Error> {
+        pink_chain_extension::mock_ext::MockExtension
+            .worker_sgx_quote()
+            .map_err(|_| "No SGX quote".into())
     }
 }
 
@@ -448,6 +458,10 @@ impl PinkExtBackend for CallInCommand {
         return Ok(ext::JsValue::Exception(
             "js_eval is not supported".to_string(),
         ));
+    }
+
+    fn worker_sgx_quote(&self) -> Result<Option<SgxQuote>, Self::Error> {
+        Ok(None)
     }
 }
 
