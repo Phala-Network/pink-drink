@@ -14,13 +14,8 @@ use ::ink::{
     },
     primitives::Hash,
 };
-use drink::{
-    errors::MessageResult,
-    runtime::{AccountIdFor, Runtime},
-    session::Session,
-    ContractBundle,
-};
-use pink_extension::Balance;
+use drink::{errors::MessageResult, runtime::AccountIdFor, session::Session, ContractBundle};
+use pink::Balance;
 use scale::{Decode, Encode};
 
 type PinkSession = Session<PinkRuntime>;
@@ -249,29 +244,34 @@ where
     type Ret = Ret;
 
     fn submit_tx(self, session: &mut PinkSession) -> Result<Self::Ret> {
-        session.tx(|| call(self, true))
+        let actor = session.actor();
+        session.tx(move || call(self, true, actor))
     }
     fn bare_tx(self, session: &mut PinkSession) -> ContractExecResult {
-        session.tx(|| bare_call(self, false))
+        let actor = session.actor();
+        session.tx(move || bare_call(self, false, actor))
     }
     fn query(self, session: &mut PinkSession) -> Result<Self::Ret> {
-        session.query(|| call(self, false))
+        let actor = session.actor();
+        session.query(move || call(self, false, actor))
     }
     fn bare_query(self, session: &mut PinkSession) -> ContractExecResult {
-        session.query(|| bare_call(self, false))
+        let actor = session.actor();
+        session.query(move || bare_call(self, false, actor))
     }
 }
 
 fn call<Env, Args, Ret>(
     call_builder: CallBuilder<Env, Set<Call<Env>>, Set<ExecutionInput<Args>>, Set<ReturnType<Ret>>>,
     deterministic: bool,
+    actor: AccountId,
 ) -> Result<Ret>
 where
     Env: Environment<Balance = Balance>,
     Args: Encode,
     Ret: Decode,
 {
-    let result = bare_call(call_builder, deterministic);
+    let result = bare_call(call_builder, deterministic, actor);
     let result = result
         .result
         .map_err(|e| format!("Failed to execute call: {e:?}"))?;
@@ -284,12 +284,12 @@ where
 fn bare_call<Env, Args, Ret>(
     call_builder: CallBuilder<Env, Set<Call<Env>>, Set<ExecutionInput<Args>>, Set<ReturnType<Ret>>>,
     deterministic: bool,
+    actor: AccountId,
 ) -> ContractExecResult
 where
     Env: Environment<Balance = Balance>,
     Args: Encode,
 {
-    let origin = PinkRuntime::default_actor();
     let params = call_builder.params();
     let data = params.exec_input().encode();
     let callee = params.callee();
@@ -303,7 +303,7 @@ where
     };
 
     PinkRuntime::bare_call(
-        origin,
+        actor,
         address.into(),
         *params.transferred_value(),
         gas_limit,

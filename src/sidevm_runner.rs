@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use log::error;
-use pink_extension::chain_extension::JsValue;
+use pink::chain_extension::JsValue;
 use scale::Decode;
 use sidevm_host_runtime::{
     CacheOps, DynCacheOps, OcallError, OutgoingRequest, WasmEngine, WasmInstanceConfig,

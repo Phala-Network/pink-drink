@@ -20,7 +20,6 @@ use sp_runtime::{
     Perbill,
 };
 
-pub use pink_extension::{EcdhPublicKey, HookPoint, Message, OspMessage, PinkEvent};
 pub type ContractExecResult =
     pallet_contracts_primitives::ContractExecResult<Balance, drink::EventRecordOf<PinkRuntime>>;
 pub type ContractInstantiateResult = pallet_contracts_primitives::ContractInstantiateResult<
