@@ -138,7 +138,7 @@ parameter_types! {
         schedule.limits.payload_len = 1024 * 1024; // Max size for storage value
         schedule
     };
-    pub CodeHashLockupDepositPercent: Perbill = Perbill::from_percent(30);
+    pub CodeHashLockupDepositPercent: Perbill = Perbill::from_percent(0);
 }
 
 pub enum SandboxRandomness {}
