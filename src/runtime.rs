@@ -395,20 +395,24 @@ impl PinkRuntime {
         data: Vec<u8>,
         deterministic: bool,
     ) -> ContractExecResult {
-        Contracts::bare_call(
+        let result = Contracts::bare_call(
             origin,
             dest,
             value,
             Weight::from_parts(gas_limit, u64::MAX),
             storage_deposit_limit,
             data,
-            DebugInfo::Skip,
+            DebugInfo::UnsafeDebug,
             CollectEvents::Skip,
             if deterministic {
                 Determinism::Enforced
             } else {
                 Determinism::Relaxed
             },
-        )
+        );
+        if !result.debug_message.is_empty() {
+            log::debug!("Debug message: {:?}", String::from_utf8_lossy(&result.debug_message));
+        }
+        result
     }
 }
